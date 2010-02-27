@@ -48,12 +48,13 @@ class ChunkBuffer(object):
 class winspawn(spawn):
     """A version of pexpect.spawn that works on Windows.
 
-    I/O works completely different on windows. One of the main differences is
-    that it is not possible to select() on a file descriptor that corresponds
-    to a file or a pipe. Therefore, to do non-blocking I/O, we need to use
-    threads. One thread is used to read the child's standard output, and
-    another thread reads standard error. Those results are passed down to the
-    main thread via a Queue.Queue.
+    I/O works completely different in this version when compared to the Posix
+    version of spawn. The difference is caused by the fact that it's not
+    possible on Windows to select() on a file descriptor that corresponds to a
+    file or a pipe. Therefore, to do non-blocking I/O, we need to use threads.
+    One thread is used to read the child's standard output, and another thread
+    reads standard error. Those results are passed down to the main thread via
+    a Queue.Queue.
 
     Windows also does not have ptys. It does have the concept of a "Console"
     though but it's much less sophisticated. This code runs the child in a new
