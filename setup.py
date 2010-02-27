@@ -14,7 +14,7 @@ setup(
     description = 'A version of pexpect that works under Windows.',
     author = 'Geert Jansen',
     author_email = 'geert@boskant.nl',
-    url = 'http://bitbucket.org/',
+    url = 'http://bitbucket.org/geertj/winpexpect',
     license = 'MIT',
     classifiers = ['Development Status :: 4 - Beta',
         'Intended Audience : = Developers',
