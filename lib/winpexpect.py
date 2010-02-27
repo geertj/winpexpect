@@ -54,6 +54,13 @@ class winspawn(spawn):
     threads. One thread is used to read the child's standard output, and
     another thread reads standard error. Those results are passed down to the
     main thread via a Queue.Queue.
+
+    Windows also does not have ptys. It does have the concept of a "Console"
+    though but it's much less sophisticated. This code runs the child in a new
+    console by passing the flag CREATE_NEW_CONSOLE to CreateProcess(). The
+    advantage of this is the child not interfere with the current console, and
+    it is also possible to run the main program without a console (e.g. a
+    Windows service).
     """
 
     def __init__(self, command, args=[], timeout=30, maxread=2000,
