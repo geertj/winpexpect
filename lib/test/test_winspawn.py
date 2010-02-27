@@ -68,3 +68,8 @@ class TestWinspawn(object):
         ps.close()  # closes stdin and should therefore exit powershell
         ps.wait()
         assert not ps.isalive()
+
+    def test_wait_timeout(self):
+        ps = winspawn('powershell.exe -command -')
+        assert_raises(TIMEOUT, ps.wait, timeout=2)
+        ps.terminate()

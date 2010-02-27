@@ -23,7 +23,8 @@ from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
 from win32pipe import CreatePipe
 from win32process import (STARTUPINFO, CreateProcess, GetExitCodeProcess,
                           TerminateProcess)
-from win32event import WaitForSingleObject, INFINITE, WAIT_OBJECT_0
+from win32event import (WaitForSingleObject, INFINITE, WAIT_OBJECT_0,
+                        WAIT_TIMEOUT)
 
 
 class ChunkBuffer(object):
@@ -171,11 +172,18 @@ class winspawn(spawn):
         self.stderr_reader.join()
         self.closed = True
 
-    def wait(self):
-        """Wait until the child exits. This is a blocking call."""
+    def wait(self, timeout=None):
+        """Wait until the child exits. If timeout is not specified this blocks
+        indefinately. Otherwise, timeout specifies the number of seconds to wait."""
         if self.exitstatus is not None:
             return
-        WaitForSingleObject(self.child_handle, INFINITE)
+        if timeout is None:
+            timeout = INFINITE
+        else:
+            timeout = 1000 * timeout
+        ret = WaitForSingleObject(self.child_handle, timeout)
+        if ret == WAIT_TIMEOUT:
+            raise TIMEOUT, 'Timeout exceeded in wait().'
         self.exitstatus = GetExitCodeProcess(self.child_handle)
         return self.exitstatus
 
