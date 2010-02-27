@@ -120,8 +120,8 @@ class winspawn(spawn):
         startupinfo.wShowWindow = SW_HIDE
         try:
             hp, ht, pid, tid = CreateProcess(executable, args, None, None,
-                                    True, CREATE_NEW_CONSOLE, self.cwd,
-                                    self.env, startupinfo)
+                                    True, CREATE_NEW_CONSOLE, self.env,
+                                    self.cwd, startupinfo)
         except pywintypes.error, e:
             raise WindowsError, e
         self.child_handle = hp

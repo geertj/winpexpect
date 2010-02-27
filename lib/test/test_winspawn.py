@@ -73,3 +73,18 @@ class TestWinspawn(object):
         ps = winspawn('powershell.exe -command -')
         assert_raises(TIMEOUT, ps.wait, timeout=2)
         ps.terminate()
+
+    def test_spawn_with_cwd(self):
+        # Use a directory that is not our cwd
+        cwd = os.getcwd()
+        homedir = os.path.expanduser('~')
+        if cwd != homedir:
+            dir = homedir
+        else:
+            dir, tail = os.path.splitdrive(homedir)
+        ps = winspawn('powershell.exe -command -', cwd=dir)
+        ps.sendline('Get-Location')
+        ps.expect('---\s+\r\n')
+        cwd = ps.readline().strip()
+        assert cwd == dir
+        ps.terminate()
