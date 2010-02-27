@@ -2,3 +2,9 @@ This is winpexpect, a version of pexpect that works on windows.
 
 At the moment it includes a modified copy of pexpect, but the goal is to
 get this merged upstream.
+
+To run the tests, you need Nose [1]. To run them, use:
+
+  $ python setup.py test
+
+[1] http://somethingaboutorange.com/mrl/projects/nose/0.11.1/
