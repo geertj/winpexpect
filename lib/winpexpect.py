@@ -12,8 +12,8 @@ import pywintypes
 from Queue import Queue, Empty
 from threading import Thread
 
-from pexpect import (spawn, split_command_line, which,
-                     ExceptionPexpect, EOF, TIMEOUT)
+from pexpect import (spawn, split_command_line, which, ExceptionPexpect,
+                     EOF, TIMEOUT)
 from subprocess import list2cmdline
 
 from msvcrt import open_osfhandle
