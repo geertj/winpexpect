@@ -63,17 +63,17 @@ class winspawn(spawn):
         self.child_output = Queue()
         self.chunk_buffer = ChunkBuffer()
         self.stdout_fd = None
+        self.stdout_eof = False
         self.stdout_reader = None
         self.stderr_fd = None
+        self.stderr_eof = False
         self.stderr_reader = None
         super(winspawn, self).__init__(command, args, timeout=timeout,
                 maxread=maxread, searchwindowsize=searchwindowsize,
                 logfile=logfile, cwd=cwd, env=env)
 
     def __del__(self):
-        if self.isalive():
-            print 'terminating'
-            self.terminate()
+        self.terminate()
 
     def _spawn(self, command, args=None):
         """Start the child process. If args is empty, command will be parsed
@@ -138,27 +138,34 @@ class winspawn(spawn):
         self.closed = False
 
     def terminate(self):
-        """Terminate the child process."""
-        if not self.isalive():
+        """Terminate the child process. This also closes all the file
+        descriptors."""
+        if self.child_handle is None or not self.isalive():
             return
         TerminateProcess(self.child_handle, 1)
-        self.exitstatus = GetExitCodeProcess(self.child_handle)
-        self.terminated = True
         self.close()
+        self.wait()
+        self.terminated = True
 
     def close(self):
         """Close all communications channels with the child."""
+        if self.closed:
+            return
         os.close(self.child_fd)
         os.close(self.stdout_fd)
         os.close(self.stderr_fd)
+        # File descriptors are closed, nothing can be added to the queue
+        # anymore. Empty it in case a thread was blocked on put().
         while self.child_output.qsize():
             self.child_output.get()
+        # Now the threads are ready to be joined.
         self.stdout_reader.join()
         self.stderr_reader.join()
+        self.closed = True
 
     def wait(self):
         """Wait until the child exits. This is a blocking call."""
-        if not self.isalive():
+        if self.exitstatus is not None:
             return
         WaitForSingleObject(self.child_handle, INFINITE)
         self.exitstatus = GetExitCodeProcess(self.child_handle)
@@ -166,11 +173,10 @@ class winspawn(spawn):
 
     def isalive(self):
         """Return True if the child is alive, False otherwise."""
-        if self.terminated:
+        if self.exitstatus is not None:
             return False
         ret = WaitForSingleObject(self.child_handle, 0)
         if ret == WAIT_OBJECT_0:
-            self.terminated = True
             self.exitstatus = GetExitCodeProcess(self.child_handle)
             return False
         return True
@@ -180,7 +186,7 @@ class winspawn(spawn):
         raise ExceptionPexpect, 'Signals are not availalbe on Windows'
 
     def _child_reader(self, fd):
-        """Reader thread that reads stdout/stderr of the child process."""
+        """INTERNAL: Reader thread that reads stdout/stderr of the child process."""
         status = 'data'
         while True:
             try:
@@ -194,10 +200,20 @@ class winspawn(spawn):
             if status != 'data':
                 break
 
+    def _set_eof(self, fd):
+        """INTERNAL: mark a file descriptor as end-of-file."""
+        if fd == self.stdout_fd:
+            self.stdout_eof = True
+        elif fd == self.stderr_fd:
+            self.stderr_eof = True
+
     def read_nonblocking(self, size=1, timeout=-1):
         """Non blocking read."""
         if len(self.chunk_buffer):
             return self.chunk_buffer.read(size)
+        if self.stdout_eof and self.stderr_eof:
+            assert self.child_output.qsize() == 0
+            return ''
         if timeout == -1:
             timeout = self.timeout
         try:    
@@ -207,7 +223,9 @@ class winspawn(spawn):
         if status == 'data':
             self.chunk_buffer.add(data)
         elif status == 'eof':
+            self._set_eof(fd)
             raise EOF, 'End of file in read_nonblocking().'
         elif status == 'error':
+            self._set_eof(fd)
             raise OSError, data
         return self.chunk_buffer.read(size)

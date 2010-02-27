@@ -22,6 +22,12 @@ class TestWinspawn(object):
         assert os.getcwd() == cwd
         ps.terminate()
 
+    def test_expect_stderr(self):
+        ps = winspawn('powershell.exe -command -')
+        ps.sendline('Write-Error "my-error"')
+        ps.expect('my-error')
+        ps.terminate()
+
     def test_timeout(self):
         ps = winspawn('powershell.exe -command -')
         ps.sendline('Sleep 10; Write "done sleeping"')
@@ -46,3 +52,19 @@ class TestWinspawn(object):
 
     def test_exec_not_found(self):
         assert_raises(ExceptionPexpect, winspawn, ('powershll.exe',))
+
+    def test_multiple_close(self):
+        ps = winspawn('powershell.exe -command -')
+        ps.close()
+        ps.close()
+
+    def test_multiple_terminate(self):
+        ps = winspawn('powershell.exe -command -')
+        ps.terminate()
+        ps.terminate()
+
+    def test_wait_after_close(self):
+        ps = winspawn('powershell.exe -command -')
+        ps.close()  # closes stdin and should therefore exit powershell
+        ps.wait()
+        assert not ps.isalive()
