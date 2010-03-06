@@ -17,7 +17,7 @@ setup(
     url = 'http://bitbucket.org/geertj/winpexpect/wiki/Home',
     license = 'MIT',
     classifiers = ['Development Status :: 4 - Beta',
-        'Intended Audience : = Developers',
+        'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Operating System :: Microsoft :: Windows'],
