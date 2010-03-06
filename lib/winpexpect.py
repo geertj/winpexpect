@@ -1,9 +1,9 @@
 #
-# This file is part of winpexpect. Winpexpect is free software that is
-# made available under the MIT license. Consult the file "LICENSE" that
-# is distributed together with this file for the exact licensing terms.
+# This file is part of WinPexpect. WinPexpect is free software that is made
+# available under the MIT license. Consult the file "LICENSE" that is
+# distributed together with this file for the exact licensing terms.
 #
-# Winpexpect is copyright (c) 2010 by the winpexpect authors. See the
+# WinPexpect is copyright (c) 2008-2010 by the WinPexpect authors. See the
 # file "AUTHORS" for a complete overview.
 
 import os
