@@ -17,14 +17,16 @@ from pexpect import (spawn, split_command_line, which, ExceptionPexpect,
 from subprocess import list2cmdline
 
 from msvcrt import open_osfhandle
-from win32api import SetHandleInformation
+from win32api import SetHandleInformation, GetCurrentProcess
 from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
                       STARTF_USESHOWWINDOW, CREATE_NEW_CONSOLE, SW_HIDE)
 from win32pipe import CreatePipe
-from win32process import (STARTUPINFO, CreateProcess, GetExitCodeProcess,
+from win32process import (STARTUPINFO, CreateProcessAsUser, GetExitCodeProcess,
                           TerminateProcess)
 from win32event import (WaitForSingleObject, INFINITE, WAIT_OBJECT_0,
                         WAIT_TIMEOUT)
+from win32security import (LogonUser, OpenProcessToken, LOGON32_LOGON_BATCH,
+                           LOGON32_PROVIDER_DEFAULT, TOKEN_ALL_ACCESS)
 
 
 class ChunkBuffer(object):
@@ -66,8 +68,12 @@ class winspawn(spawn):
     """
 
     def __init__(self, command, args=[], timeout=30, maxread=2000,
-                 searchwindowsize=None, logfile=None, cwd=None, env=None):
+                 searchwindowsize=None, logfile=None, cwd=None, env=None,
+                 username=None, domain=None, password=None):
         """Constructor."""
+        self.username = username
+        self.domain = domain
+        self.password = password
         self.child_handle = None
         self.child_output = Queue()
         self.chunk_buffer = ChunkBuffer()
@@ -118,10 +124,19 @@ class winspawn(spawn):
         startupinfo.hStdOutput = stdout_write
         startupinfo.hStdError = stderr_write
         startupinfo.wShowWindow = SW_HIDE
+
+        # Create a new token or run as the current process.
+        if self.username and self.password:
+            token = LogonUser(self.username, self.domain, self.password,
+                              LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT)
+        else:
+            token = OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS)
+
+        # Finally we can launch..
         try:
-            hp, ht, pid, tid = CreateProcess(executable, args, None, None,
-                                    True, CREATE_NEW_CONSOLE, self.env,
-                                    self.cwd, startupinfo)
+            hp, ht, pid, tid = CreateProcessAsUser(token, executable, args,
+                                    None, None, True, CREATE_NEW_CONSOLE,
+                                    self.env, self.cwd, startupinfo)
         except pywintypes.error, e:
             raise WindowsError, e
         self.child_handle = hp
