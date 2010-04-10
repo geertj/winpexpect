@@ -8,12 +8,12 @@
 
 import os
 import pywintypes
+import itertools
 
 from Queue import Queue, Empty
 from threading import Thread
 
-from pexpect import (spawn, split_command_line, which, ExceptionPexpect,
-                     EOF, TIMEOUT)
+from pexpect import (spawn, which, ExceptionPexpect, EOF, TIMEOUT)
 from subprocess import list2cmdline
 
 from msvcrt import open_osfhandle
@@ -28,6 +28,79 @@ from win32event import (WaitForSingleObject, INFINITE, WAIT_OBJECT_0,
 from win32security import (LogonUser, OpenProcessToken, LOGON32_LOGON_BATCH,
                            LOGON32_PROVIDER_DEFAULT, TOKEN_ALL_ACCESS)
 from pywintypes import error as WindowsError
+
+
+# Compatibility with Python < 2.6
+try:
+    from collections import namedtuple
+except ImportError:
+    def namedtuple(name, fields):
+        d = dict(zip(fields, [None]*len(fields)))
+        return type(name, (object,), d)
+
+
+def split_command_line(cmdline):
+    """Split a command line into a command and its arguments according to
+    the rules of the Microsoft C runtime."""
+    # http://msdn.microsoft.com/en-us/library/ms880421
+    s_free, s_in_quotes, s_in_escape = range(3)
+    state = namedtuple('state',
+                ('current', 'previous', 'escape_level', 'argument'))
+    state.current = s_free
+    state.previous = s_free
+    state.argument = []
+    result = []
+    for c in itertools.chain(cmdline, ['EOI']):  # Mark End of Input
+        if state.current == s_free:
+            if c == '"':
+                state.current = s_in_quotes
+                state.previous = s_free
+            elif c == '\\':
+                state.current = s_in_escape
+                state.previous = s_free
+                state.escape_count = 1
+            elif c in (' ', '\t', 'EOI'):
+                if state.argument or state.previous != s_free:
+                    result.append(''.join(state.argument))
+                    del state.argument[:]
+            else:
+                state.argument.append(c)
+        elif state.current == s_in_quotes:
+            if c == '"':
+                state.current = s_free
+                state.previous = s_in_quotes
+            elif c == '\\':
+                state.current = s_in_escape
+                state.previous = s_in_quotes
+                state.escape_count = 1
+            else:
+                state.argument.append(c)
+        elif state.current == s_in_escape:
+            if c == '\\':
+                state.escape_count += 1
+            elif c == '"':
+                nbs, escaped_delim = divmod(state.escape_count, 2)
+                state.argument.append(nbs * '\\')
+                if escaped_delim:
+                    state.argument.append('"')
+                    state.current = state.previous
+                else:
+                    if state.previous == s_in_quotes:
+                        state.current = s_free
+                    else:
+                        state.current = s_in_quotes
+                state.previous = s_in_escape
+            else:
+                state.argument.append(state.escape_count * '\\')
+                state.argument.append(c)
+                state.current = state.previous
+                state.previous = s_in_escape
+    if state.current != s_free:
+        raise ValueError, 'Illegal command line.'
+    return result
+
+
+join_command_line = list2cmdline
 
 
 class ChunkBuffer(object):
@@ -106,7 +179,7 @@ class winspawn(spawn):
         executable = which(self.command)
         if executable is None:
             raise ExceptionPexpect, 'Command not found: %s' % self.command
-        args = list2cmdline(self.args)
+        args = join_command_line(self.args)
 
         # Create the pipes
         stdin_read, stdin_write = CreatePipe(None, 0)
