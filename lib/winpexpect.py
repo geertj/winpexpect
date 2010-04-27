@@ -20,12 +20,15 @@ from subprocess import list2cmdline
 
 from msvcrt import open_osfhandle
 from win32api import (SetHandleInformation, GetCurrentProcess, OpenProcess,
-                      CloseHandle)
+                      CloseHandle, GetCurrentThread)
 from win32pipe import CreateNamedPipe, ConnectNamedPipe
 from win32process import (STARTUPINFO, CreateProcess, CreateProcessAsUser,
 			  GetExitCodeProcess, TerminateProcess, ExitProcess)
 from win32event import WaitForSingleObject, INFINITE
-from win32security import LogonUser
+from win32security import (LogonUser, OpenThreadToken, OpenProcessToken,
+                           GetTokenInformation, TokenUser, ACL_REVISION_DS,
+                           ConvertSidToStringSid, ConvertStringSidToSid,
+                           SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, ACL)
 from win32file import CreateFile, ReadFile, WriteFile
 
 from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
@@ -33,7 +36,8 @@ from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
                       PIPE_ACCESS_DUPLEX, WAIT_OBJECT_0,
                       WAIT_TIMEOUT, LOGON32_PROVIDER_DEFAULT,
                       LOGON32_LOGON_BATCH, TOKEN_ALL_ACCESS, GENERIC_READ,
-                      GENERIC_WRITE, OPEN_EXISTING, PROCESS_ALL_ACCESS)
+                      GENERIC_WRITE, OPEN_EXISTING, PROCESS_ALL_ACCESS,
+                      MAXIMUM_ALLOWED)
 from winerror import ERROR_PIPE_BUSY, ERROR_HANDLE_EOF, ERROR_BROKEN_PIPE
 from pywintypes import error as WindowsError
 
@@ -145,6 +149,16 @@ def _quote_header(s):
     return s.replace('\n', '\n ')
 
 
+def _get_current_sid():
+    """INTERNAL: get current SID."""
+    try:
+        token = OpenThreadToken(GetCurrentThread(), MAXIMUM_ALLOWED, True)
+    except WindowsError:
+        token = OpenProcessToken(GetCurrentProcess(), MAXIMUM_ALLOWED)
+    sid = GetTokenInformation(token, TokenUser)[0]
+    return sid
+
+
 def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
     """INTERNAL: Stub process that will start up the child process."""
     # Open the 4 pipes (command, stdin, stdout, stderr)
@@ -174,8 +188,23 @@ def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
     startupinfo.hStdOutput = stdout_pipe
     startupinfo.hStdError = stderr_pipe
 
+    # Grant access so that our parent can open its grandchild.
+    if 'parent_sid' in input:
+        attr = SECURITY_ATTRIBUTES()
+        attr.bInheritHandle = 1
+        desc = SECURITY_DESCRIPTOR()
+        dacl = ACL()
+        sid = ConvertStringSidToSid(input['parent_sid'])
+        dacl.AddAccessAllowedAce(ACL_REVISION_DS, PROCESS_ALL_ACCESS, sid)
+        sid = _get_current_sid()
+        dacl.AddAccessAllowedAce(ACL_REVISION_DS, PROCESS_ALL_ACCESS, sid)
+        desc.SetSecurityDescriptorDacl(True, dacl, False)
+        attr.SECURITY_DESCRIPTOR = desc
+    else:
+        attr = None
+
     try:
-        res = CreateProcess(input['command'], input['args'], None, None,
+        res = CreateProcess(input['command'], input['args'], attr, None,
                             True, 0, os.environ, os.getcwd(), startupinfo)
     except WindowsError, e:
         message = _quote_header(str(e))
@@ -319,6 +348,7 @@ class winspawn(spawn):
                                       False, CREATE_NEW_CONSOLE, self.env,
                                       self.cwd, startupinfo)
         else:
+            token = None
             res = CreateProcess(python, pyargs, None, None, False,
                                 0, self.env, self.cwd,
                                 startupinfo)
@@ -331,7 +361,13 @@ class winspawn(spawn):
         ConnectNamedPipe(stderr_pipe)
 
         # Tell the stub what to do and wait for it to exit
-        WriteFile(cmd_pipe, 'command=%s\nargs=%s\n\n' % (command, args))
+        WriteFile(cmd_pipe, 'command=%s\n' % command)
+        WriteFile(cmd_pipe, 'args=%s\n' % args)
+        if token:
+            parent_sid = ConvertSidToStringSid(_get_current_sid())
+            WriteFile(cmd_pipe, 'parent_sid=%s\n' % str(parent_sid))
+        WriteFile(cmd_pipe, '\n')
+
         header = _read_header(cmd_pipe)
         output = _parse_header(header)
         if output['status'] != 'ok':
