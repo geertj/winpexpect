@@ -240,20 +240,18 @@ class ChunkBuffer(object):
 class winspawn(spawn):
     """A version of pexpect.spawn for the Windows platform. """
 
-    # I/O works completely different in this version when compared to the
-    # Posix version of spawn.
+    # The Windows version of spawn is quite different when compared to the
+    # Posix version.
     #
     # The first difference is that it's not possible on Windows to select()
     # on a file descriptor that corresponds to a file or a pipe. Therefore,
-    # to do non-blocking I/O, we need to use threads. We use one thread to
-    # read the output of our child.
+    # to do non-blocking I/O, we need to use threads.
     #
-    # The second difference is that there is no fork()/exec() on Windows
-    # but just a CreateProcess(). There is no way to close file all file
-    # descriptors /except/ the redirected stdin/out/err. So we indirectly
-    # execute our child via a stub for which we pass a flag to
-    # CreateProcess() to close all file descriptors. The stub communicates
-    # back to us via a named pipe.
+    # Secondly, there is no way to pass /only/ the file descriptors
+    # corresponding to the redirected stdin/out/err to the child. Either all
+    # inheritable file descriptors are passed, or none. We solve this by
+    # indirectly executing our child via a stub for which we close all file
+    # descriptors. The stub communicates back to us via a named pipe.
     # 
     # Finally, Windows does not have ptys. It does have the concept of a
     # "Console" though but it's much less sophisticated. This code runs the
