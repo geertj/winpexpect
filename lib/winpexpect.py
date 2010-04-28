@@ -392,7 +392,7 @@ class winspawn(spawn):
     def terminate(self):
         """Terminate the child process. This also closes all the file
         descriptors."""
-        if self.child_handle is None or not self.isalive():
+        if self.child_handle is None or self.terminated:
             return
         TerminateProcess(self.child_handle, 1)
         self.close()
