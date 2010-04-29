@@ -183,10 +183,11 @@ def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
 
     # http://msdn.microsoft.com/en-us/library/ms682499(VS.85).aspx
     startupinfo = STARTUPINFO()
-    startupinfo.dwFlags |= STARTF_USESTDHANDLES
+    startupinfo.dwFlags |= STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW
     startupinfo.hStdInput = stdin_pipe
     startupinfo.hStdOutput = stdout_pipe
     startupinfo.hStdError = stderr_pipe
+    startupinfo.wShowWindow = SW_HIDE
 
     # Grant access so that our parent can open its grandchild.
     if 'parent_sid' in input:
@@ -205,7 +206,8 @@ def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
 
     try:
         res = CreateProcess(input['command'], input['args'], attr, None,
-                            True, 0, os.environ, os.getcwd(), startupinfo)
+                            True, CREATE_NEW_CONSOLE, os.environ, os.getcwd(),
+                            startupinfo)
     except WindowsError, e:
         message = _quote_header(str(e))
         WriteFile(cmd_pipe, 'status=error\nmessage=%s\n\n' % message)
