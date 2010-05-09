@@ -23,5 +23,6 @@ setup(
         'Operating System :: Microsoft :: Windows'],
     package_dir = {'': 'lib'},
     py_modules = ['pexpect', 'winpexpect'],
-    test_suite = 'nose.collector'
+    test_suite = 'nose.collector',
+    zip_safe = False
 )
