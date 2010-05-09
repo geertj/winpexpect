@@ -33,11 +33,10 @@ from win32file import CreateFile, ReadFile, WriteFile
 
 from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
                       STARTF_USESHOWWINDOW, CREATE_NEW_CONSOLE, SW_HIDE,
-                      PIPE_ACCESS_DUPLEX, WAIT_OBJECT_0,
-                      WAIT_TIMEOUT, LOGON32_PROVIDER_DEFAULT,
-                      LOGON32_LOGON_BATCH, TOKEN_ALL_ACCESS, GENERIC_READ,
-                      GENERIC_WRITE, OPEN_EXISTING, PROCESS_ALL_ACCESS,
-                      MAXIMUM_ALLOWED)
+                      PIPE_ACCESS_DUPLEX, WAIT_OBJECT_0, WAIT_TIMEOUT,
+                      LOGON32_PROVIDER_DEFAULT, LOGON32_LOGON_INTERACTIVE,
+                      TOKEN_ALL_ACCESS, GENERIC_READ, GENERIC_WRITE,
+                      OPEN_EXISTING, PROCESS_ALL_ACCESS, MAXIMUM_ALLOWED)
 from winerror import ERROR_PIPE_BUSY, ERROR_HANDLE_EOF, ERROR_BROKEN_PIPE
 from pywintypes import error as WindowsError
 
@@ -343,7 +342,7 @@ class winspawn(spawn):
         # Create a new token or run as the current process.
         if self.username and self.password:
             token = LogonUser(self.username, self.domain, self.password,
-                              LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT)
+                              LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT)
             res = CreateProcessAsUser(token, python, pyargs, None, None,
                                       False, CREATE_NEW_CONSOLE, self.env,
                                       self.cwd, startupinfo)
