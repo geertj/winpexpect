@@ -10,7 +10,7 @@ from setuptools import setup
 
 setup(
     name = 'winpexpect',
-    version = '1.2',
+    version = '1.3',
     description = 'A version of pexpect that works under Windows.',
     author = 'Geert Jansen',
     author_email = 'geert@boskant.nl',
