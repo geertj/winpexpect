@@ -37,7 +37,8 @@ from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
                       LOGON32_PROVIDER_DEFAULT, LOGON32_LOGON_INTERACTIVE,
                       TOKEN_ALL_ACCESS, GENERIC_READ, GENERIC_WRITE,
                       OPEN_EXISTING, PROCESS_ALL_ACCESS, MAXIMUM_ALLOWED)
-from winerror import ERROR_PIPE_BUSY, ERROR_HANDLE_EOF, ERROR_BROKEN_PIPE
+from winerror import (ERROR_PIPE_BUSY, ERROR_HANDLE_EOF, ERROR_BROKEN_PIPE,
+                      ERROR_ACCESS_DENIED)
 from pywintypes import error as WindowsError
 
 
@@ -395,7 +396,15 @@ class winspawn(spawn):
         descriptors."""
         if self.child_handle is None or self.terminated:
             return
-        TerminateProcess(self.child_handle, 1)
+        try:
+            TerminateProcess(self.child_handle, 1)
+        except WindowsError, e:
+            # ERROR_ACCESS_DENIED (also) happens when the child has already
+            # exited.
+            if e.winerror == ERROR_ACCESS_DENIED and not self.isalive():
+                pass
+            else:
+                raise
         self.close()
         self.wait()
         self.terminated = True
