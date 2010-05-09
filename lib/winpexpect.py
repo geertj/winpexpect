@@ -350,7 +350,7 @@ class winspawn(spawn):
         else:
             token = None
             res = CreateProcess(python, pyargs, None, None, False,
-                                0, self.env, self.cwd,
+                                CREATE_NEW_CONSOLE, self.env, self.cwd,
                                 startupinfo)
         child_handle = res[0]
         res[1].Close()  # don't need thread handle
