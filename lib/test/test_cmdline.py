@@ -59,7 +59,4 @@ class TestCommandLine(object):
 
     def test_join(self):
         for l,ref in self.join_ok:
-            j = join_command_line(l)
-            if j != ref:
-                print '%s != %s' % (repr(j), repr(ref))
             assert join_command_line(l) == ref
