@@ -12,7 +12,6 @@ from setuptools import setup
 
 if sys.version_info[0] == 3:
     from lib2to3.fixes import fix_types
-    print('fixing fixer')
     fix_types._TYPE_MAPPING['StringTypes'] = '(str,)'
 
 setup(
