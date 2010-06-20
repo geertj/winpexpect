@@ -15,7 +15,7 @@ import random
 from Queue import Queue, Empty
 from threading import Thread
 
-from pexpect import spawn, which, ExceptionPexpect, EOF, TIMEOUT
+from pexpect import spawn, ExceptionPexpect, EOF, TIMEOUT
 from subprocess import list2cmdline
 
 from msvcrt import open_osfhandle
@@ -113,6 +113,18 @@ def split_command_line(cmdline):
 
 
 join_command_line = list2cmdline
+
+
+def which(command):
+    path = os.environ.get('Path', '')
+    path = path.split(os.pathsep)
+    pathext = os.environ.get('Pathext', '.exe;.com;.bat;.cmd')
+    pathext = pathext.split(os.pathsep)
+    for dir in itertools.chain([''], path):
+        for ext in itertools.chain([''], pathext):
+            fname = os.path.join(dir, command) + ext
+            if os.access(fname, os.X_OK):
+                return fname
 
 
 def _read_header(handle, bufsize=4096):
