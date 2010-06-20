@@ -6,7 +6,14 @@
 # WinPexpect is copyright (c) 2008-2010 by the WinPexpect authors. See the
 # file "AUTHORS" for a complete overview.
 
+import sys
 from setuptools import setup
+
+
+if sys.version_info[0] == 3:
+    from lib2to3.fixes import fix_types
+    print('fixing fixer')
+    fix_types._TYPE_MAPPING['StringTypes'] = '(str,)'
 
 setup(
     name = 'winpexpect',
@@ -24,5 +31,6 @@ setup(
     package_dir = {'': 'lib'},
     py_modules = ['pexpect', 'winpexpect'],
     test_suite = 'nose.collector',
-    zip_safe = False
+    zip_safe = False,
+    use_2to3 = True
 )

@@ -50,6 +50,18 @@ except ImportError:
         d = dict(zip(fields, [None]*len(fields)))
         return type(name, (object,), d)
 
+# Compatbility wiht Python 3
+if sys.version_info[0] == 3:
+
+    _WriteFile = WriteFile
+    def WriteFile(handle, s):
+        return _WriteFile(handle, s.encode('ascii'))
+
+    _ReadFile = ReadFile
+    def ReadFile(handle, size):
+        err, data = _ReadFile(handle, size)
+        return err, data.decode('ascii')
+
 
 def split_command_line(cmdline):
     """Split a command line into a command and its arguments according to
