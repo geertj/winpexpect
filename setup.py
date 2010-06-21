@@ -16,7 +16,7 @@ if sys.version_info[0] == 3:
 
 setup(
     name = 'winpexpect',
-    version = '1.3',
+    version = '1.4',
     description = 'A version of pexpect that works under Windows.',
     author = 'Geert Jansen',
     author_email = 'geert@boskant.nl',
