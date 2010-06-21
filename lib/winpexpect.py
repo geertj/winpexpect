@@ -28,7 +28,8 @@ from win32event import WaitForSingleObject, INFINITE
 from win32security import (LogonUser, OpenThreadToken, OpenProcessToken,
                            GetTokenInformation, TokenUser, ACL_REVISION_DS,
                            ConvertSidToStringSid, ConvertStringSidToSid,
-                           SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, ACL)
+                           SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, ACL,
+                           LookupAccountName)
 from win32file import CreateFile, ReadFile, WriteFile
 
 from win32con import (HANDLE_FLAG_INHERIT, STARTF_USESTDHANDLES,
@@ -183,6 +184,46 @@ def _get_current_sid():
     return sid
 
 
+def _lookup_sid(domain, username):
+    """INTERNAL: lookup the SID for a user in a domain."""
+    return LookupAccountName(domain, username)[0]
+
+
+def _create_security_attributes(*sids, **kwargs):
+    """INTERNAL: create a SECURITY_ATTRIBUTES structure."""
+    inherit = kwargs.get('inherit', 0)
+    access = kwargs.get('access', GENERIC_READ|GENERIC_WRITE)
+    attr = SECURITY_ATTRIBUTES()
+    attr.bInheritHandle = inherit
+    desc = SECURITY_DESCRIPTOR()
+    dacl = ACL()
+    for sid in sids:
+        dacl.AddAccessAllowedAce(ACL_REVISION_DS, access, sid)
+    desc.SetSecurityDescriptorDacl(True, dacl, False)
+    attr.SECURITY_DESCRIPTOR = desc
+    return attr
+
+
+def _create_named_pipe(template, sids=None):
+    """INTERNAL: create a named pipe."""
+    if sids is None:
+        sattrs = None
+    else:
+        sattrs = _create_security_attributes(*sids)
+    for i in range(100):
+        name = template % random.randint(0, 999999)
+        try:
+            pipe = CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
+                                   0, 1, 1, 1, 100000, sattrs)
+            SetHandleInformation(pipe, HANDLE_FLAG_INHERIT, 0)
+        except WindowsError, e:
+            if e.winerror != ERROR_PIPE_BUSY:
+                raise
+        else:
+            return pipe, name
+    raise ExceptionPexpect, 'Could not create pipe after 100 attempts.'
+
+
 def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
     """INTERNAL: Stub process that will start up the child process."""
     # Open the 4 pipes (command, stdin, stdout, stderr)
@@ -215,21 +256,15 @@ def _stub(cmd_name, stdin_name, stdout_name, stderr_name):
 
     # Grant access so that our parent can open its grandchild.
     if 'parent_sid' in input:
-        attr = SECURITY_ATTRIBUTES()
-        attr.bInheritHandle = 1
-        desc = SECURITY_DESCRIPTOR()
-        dacl = ACL()
-        sid = ConvertStringSidToSid(input['parent_sid'])
-        dacl.AddAccessAllowedAce(ACL_REVISION_DS, PROCESS_ALL_ACCESS, sid)
-        sid = _get_current_sid()
-        dacl.AddAccessAllowedAce(ACL_REVISION_DS, PROCESS_ALL_ACCESS, sid)
-        desc.SetSecurityDescriptorDacl(True, dacl, False)
-        attr.SECURITY_DESCRIPTOR = desc
+        mysid = _get_current_sid()
+        parent = ConvertStringSidToSid(input['parent_sid'])
+        sattrs = _create_security_attributes(mysid, parent,
+                                             access=PROCESS_ALL_ACCESS)
     else:
-        attr = None
+        sattrs = None
 
     try:
-        res = CreateProcess(input['command'], input['args'], attr, None,
+        res = CreateProcess(input['command'], input['args'], sattrs, None,
                             True, CREATE_NEW_CONSOLE, os.environ, os.getcwd(),
                             startupinfo)
     except WindowsError, e:
@@ -316,21 +351,6 @@ class winspawn(spawn):
         except WindowsError:
             pass
 
-    def _create_pipe(self):
-        """INTERNAL: create a named pipe."""
-        for i in range(100):
-            name = self.pipe_template % random.randint(0, 999999)
-            try:
-                pipe = CreateNamedPipe(name, PIPE_ACCESS_DUPLEX,
-                                       0, 1, 1, 1, 100000, None)
-                SetHandleInformation(pipe, HANDLE_FLAG_INHERIT, 0)
-            except WindowsError, e:
-                if e.winerror != ERROR_PIPE_BUSY:
-                    raise
-            else:
-                return pipe, name
-        raise ExceptionPexpect, 'Could not create pipe after 100 attempts.'
-
     def _spawn(self, command, args=None):
         """Start the child process. If args is empty, command will be parsed
         according to the rules of the MS C runtime, and args will be set to
@@ -350,10 +370,13 @@ class winspawn(spawn):
         args = join_command_line(self.args)
 
         # Create the pipes
-        cmd_pipe, cmd_name = self._create_pipe()
-        stdin_pipe, stdin_name = self._create_pipe()
-        stdout_pipe, stdout_name = self._create_pipe()
-        stderr_pipe, stderr_name = self._create_pipe()
+        sids = [_get_current_sid()]
+        if self.username and self.password:
+            sids.append(_lookup_sid(self.domain, self.username))
+        cmd_pipe, cmd_name = _create_named_pipe(self.pipe_template, sids)
+        stdin_pipe, stdin_name = _create_named_pipe(self.pipe_template, sids)
+        stdout_pipe, stdout_name = _create_named_pipe(self.pipe_template, sids)
+        stderr_pipe, stderr_name = _create_named_pipe(self.pipe_template, sids)
 
         startupinfo = STARTUPINFO()
         startupinfo.dwFlags |= STARTF_USESHOWWINDOW
