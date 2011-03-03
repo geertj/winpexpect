@@ -523,9 +523,9 @@ class winspawn(spawn):
 
     def _set_eof(self, handle):
         """INTERNAL: mark a file handle as end-of-file."""
-        if fd == self.stdout_handle:
+        if handle == self.stdout_handle:
             self.stdout_eof = True
-        elif fd == self.stderr_handle:
+        elif handle == self.stderr_handle:
             self.stderr_eof = True
 
     def read_nonblocking(self, size=1, timeout=-1):
