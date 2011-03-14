@@ -30,7 +30,7 @@ setup(
     package_dir = {'': 'lib'},
     py_modules = ['pexpect', 'winpexpect'],
     test_suite = 'nose.collector',
-    install_requires = ['pywin32 >= 214', 'nose' ],
+    install_requires = ['pywin32 >= 214'],
     zip_safe = False,
     use_2to3 = True
 )
