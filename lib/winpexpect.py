@@ -549,4 +549,11 @@ class winspawn(spawn):
         elif status == 'error':
             self._set_eof(handle)
             raise OSError, data
-        return self.chunk_buffer.read(size)
+        buf = self.chunk_buffer.read(size)
+        if self.logfile is not None:
+            self.logfile.write(buf)
+            self.logfile.flush()
+        if self.logfile_read is not None:
+            self.logfile_read.write(buf)
+            self.logfile_read.flush()
+        return buf
